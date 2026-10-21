@@ -1,0 +1,154 @@
+{
+  "item": [
+    {
+      "name": "01 - Cadastrar jogo sem ID",
+      "event": [
+        {
+          "script": {
+            "exec": [
+              "pm.test(\"Cadastro realizado\", () => pm.response.to.have.status(200));"
+            ],
+            "type": "text/javascript"
+          },
+          "listen": "test"
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/game/review/gravar-jogo",
+        "body": {
+          "raw": "{\"nome\":\"Jogo Demonstracao\",\"metacritic\":90,\"genero\":\"Aventura\",\"sinopse\":\"Jogo para demonstrar persistência no PostgreSQL.\"}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "02 - Listar jogos e guardar ID",
+      "event": [
+        {
+          "script": {
+            "exec": [
+              "const jogo = pm.response.json().find(g => g.nome === \"Jogo Demonstracao\"); pm.test(\"Jogo possui ID gerado\", () => pm.expect(jogo && jogo.id).to.be.a(\"number\")); if (jogo) pm.collectionVariables.set(\"id\", jogo.id);"
+            ],
+            "type": "text/javascript"
+          },
+          "listen": "test"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/listar-jogos"
+      }
+    },
+    {
+      "name": "03 - Buscar por ID (repetir após reiniciar)",
+      "event": [
+        {
+          "script": {
+            "exec": [
+              "pm.test(\"Registro persistido\", () => { pm.response.to.have.status(200); pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"id\"))); pm.expect(pm.response.json().nome).to.eql(\"Jogo Demonstracao\"); });"
+            ],
+            "type": "text/javascript"
+          },
+          "listen": "test"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/id/{{id}}"
+      }
+    },
+    {
+      "name": "04 - Três filtros combinados",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/listar-jogos?nome=Demonstracao&genero=Aventura&metacritic=90"
+      }
+    },
+    {
+      "name": "05 - Atualizar jogo",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/game/review/Jogo%20Demonstracao/editar-jogo",
+        "body": {
+          "raw": "{\"nome\":\"Jogo Demonstracao\",\"metacritic\":91,\"genero\":\"Aventura\",\"sinopse\":\"Sinopse atualizada.\"}",
+          "mode": "raw",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "06 - Consultar atualização",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/id/{{id}}"
+      }
+    },
+    {
+      "name": "07 - Excluir jogo (somente após a demonstração)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/Jogo%20Demonstracao/deletar-jogo"
+      }
+    },
+    {
+      "name": "08 - Confirmar exclusão",
+      "event": [
+        {
+          "script": {
+            "exec": [
+              "pm.test(\"Excluído\", () => pm.response.to.have.status(404));"
+            ],
+            "type": "text/javascript"
+          },
+          "listen": "test"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/game/review/id/{{id}}"
+      }
+    }
+  ],
+  "info": {
+    "name": "GamesReview - Trabalho II",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "id",
+      "value": ""
+    }
+  ]
+}
