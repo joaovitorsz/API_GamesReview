@@ -25,6 +25,5 @@ public class Game {
     private String sinopse;
 
     @OneToMany(mappedBy = "game", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderColumn(name = "ordem")
     private List<Avaliacoes> avaliacoes = new ArrayList<>();
 }

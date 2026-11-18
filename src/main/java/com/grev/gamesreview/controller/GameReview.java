@@ -1,7 +1,12 @@
 package com.grev.gamesreview.controller;
 
+import com.grev.gamesreview.DTO.AvaliacaoRequestDTO;
+import com.grev.gamesreview.DTO.AvaliacaoResponseDTO;
+import com.grev.gamesreview.DTO.GameRequestDTO;
+import com.grev.gamesreview.DTO.GameResponseDTO;
 import com.grev.gamesreview.model.Avaliacoes;
 import com.grev.gamesreview.model.Game;
+import com.grev.gamesreview.repository.AvaliacoesRepository;
 import com.grev.gamesreview.repository.GameRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +19,11 @@ import java.util.List;
 @Transactional
 public class GameReview {
     private final GameRepository repository;
+    private final AvaliacoesRepository avaliacoesRepository;
 
-    public GameReview(GameRepository repository) {
+    public GameReview(GameRepository repository, AvaliacoesRepository avaliacoesRepository) {
         this.repository = repository;
+        this.avaliacoesRepository = avaliacoesRepository;
     }
 
     // Gets
@@ -54,108 +61,131 @@ public class GameReview {
     }
 
     @GetMapping("/review/listar-jogos")
-    public ResponseEntity<List<Game>> listarJogos(
+    public ResponseEntity<List<GameResponseDTO>> listarJogos(
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String genero,
             @RequestParam(required = false) Integer metacritic) {
+
+        List<Game> jogos;
         if (nome == null && genero == null && metacritic == null) {
-            return ResponseEntity.ok(repository.findAll());
+            jogos = repository.findAll();
+        } else {
+            jogos = repository.filtrar(nome, genero, metacritic);
         }
-        return ResponseEntity.ok(repository.filtrar(nome, genero, metacritic));
+
+        List<GameResponseDTO> resposta = jogos.stream()
+                .map(GameResponseDTO::new)
+                .toList();
+
+        return ResponseEntity.ok(resposta);
     }
 
     @GetMapping("/review/id/{id}")
-    public ResponseEntity<Game> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<GameResponseDTO> buscarPorId(@PathVariable Long id) {
         Game game = repository.findById(id).orElse(null);
         if (game == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(game);
+        return ResponseEntity.ok(new GameResponseDTO(game));
     }
 
     @GetMapping("/review/{nome}/listar-avaliacoes")
-    public ResponseEntity<List<Avaliacoes>> gameAvaliacoes(@PathVariable String nome) {
+    public ResponseEntity<List<AvaliacaoResponseDTO>> gameAvaliacoes(@PathVariable String nome) {
         Game game = repository.findFirstByNomeOrderByIdAsc(nome).orElse(null);
         if (game == null) {
             return ResponseEntity.noContent().build();
         }
-        return ResponseEntity.ok(game.getAvaliacoes());
+
+        List<AvaliacaoResponseDTO> avaliacoesDTO = game.getAvaliacoes().stream()
+                .map(AvaliacaoResponseDTO::new)
+                .toList();
+
+        return ResponseEntity.ok(avaliacoesDTO);
     }
 
     // Posts
 
     @PostMapping("/review/gravar-jogo")
-    public String gravarJogo(@RequestBody(required = false) Game novoJogo) {
-        if (novoJogo == null) {
-            return "Insira um novo jogo para prosseguir!";
-        }
-        novoJogo.setId(null);
-        if (novoJogo.getAvaliacoes() == null) {
-            novoJogo.setAvaliacoes(new ArrayList<>());
-        }
-        for (Avaliacoes avaliacao : novoJogo.getAvaliacoes()) {
-            avaliacao.setId(null);
-            avaliacao.setGame(novoJogo);
-        }
-        repository.save(novoJogo);
-        return novoJogo.getNome() + " foi adicionado à lista com sucesso!";
+    public ResponseEntity<GameResponseDTO> gravarJogo(@RequestBody GameRequestDTO dados) {
+
+        Game novoJogo = new Game();
+        novoJogo.setNome(dados.titulo());
+        novoJogo.setGenero(dados.genero());
+        novoJogo.setMetacritic(dados.metacritic());
+        novoJogo.setSinopse(dados.sinopse());
+
+        Game jogoSalvo = repository.save(novoJogo);
+
+        return ResponseEntity.ok(new GameResponseDTO(jogoSalvo));
     }
 
     @PostMapping("/review/{nome}/gravar-avaliacao")
-    public ResponseEntity<String> gravarAvaliacao(@PathVariable String nome,
-            @RequestBody(required = false) Avaliacoes avaliacao) {
-        if (avaliacao == null) {
-            return ResponseEntity.badRequest().body("Insira uma avaliação para prosseguir!");
+    public ResponseEntity<AvaliacaoResponseDTO> gravarAvaliacao(@PathVariable String nome,
+                                                                @RequestBody AvaliacaoRequestDTO dados) {
+        if (dados == null) {
+            return ResponseEntity.badRequest().build();
         }
         Game game = repository.findFirstByNomeOrderByIdAsc(nome).orElse(null);
         if (game == null) {
             return ResponseEntity.noContent().build();
         }
-        avaliacao.setId(null);
-        avaliacao.setGame(game);
-        game.getAvaliacoes().add(avaliacao);
-        repository.save(game);
-        return ResponseEntity.ok("A avaliação de " + game.getNome() + " foi adicionada com sucesso!");
+
+        Avaliacoes novaAvaliacao = new Avaliacoes();
+        novaAvaliacao.setAvaliador(dados.avaliador());
+        novaAvaliacao.setNota(dados.nota());
+        novaAvaliacao.setComentario(dados.comentario());
+        novaAvaliacao.setGame(game);
+
+        Avaliacoes avaliacaoSalva = avaliacoesRepository.save(novaAvaliacao);
+
+        return ResponseEntity.ok(new AvaliacaoResponseDTO(avaliacaoSalva));
     }
 
     // Puts
 
     @PutMapping("/review/{nome}/editar-jogo")
-    public ResponseEntity<String> editarJogo(@PathVariable String nome,
-            @RequestBody(required = false) Game dados) {
+    public ResponseEntity<GameResponseDTO> editarJogo(
+            @PathVariable String nome,
+            @RequestBody GameRequestDTO dados) {
+
         if (dados == null) {
-            return ResponseEntity.badRequest().body("Insira um jogo para prosseguir!");
+            return ResponseEntity.badRequest().build();
         }
         Game game = repository.findFirstByNomeOrderByIdAsc(nome).orElse(null);
         if (game == null) {
             return ResponseEntity.noContent().build();
         }
-        game.setNome(dados.getNome());
-        game.setMetacritic(dados.getMetacritic());
-        game.setGenero(dados.getGenero());
-        game.setSinopse(dados.getSinopse());
-        repository.save(game);
-        return ResponseEntity.ok(game.getNome() + " foi editado com sucesso!");
+        game.setNome(dados.titulo());
+        game.setMetacritic(dados.metacritic());
+        game.setGenero(dados.genero());
+        game.setSinopse(dados.sinopse());
+
+        Game jogoAtualizado = repository.save(game);
+
+        return ResponseEntity.ok(new GameResponseDTO(jogoAtualizado));
     }
 
-    @PutMapping("/review/{nome}/editar-avaliacao/{index}")
-    public ResponseEntity<String> editarAvaliacao(@PathVariable String nome, @PathVariable int index,
-            @RequestBody(required = false) Avaliacoes dados) {
+    @PutMapping("/review/editar-avaliacao/{idAvaliacao}")
+    public ResponseEntity<AvaliacaoResponseDTO> editarAvaliacao(
+            @PathVariable Integer idAvaliacao,
+            @RequestBody AvaliacaoRequestDTO dados) {
+
         if (dados == null) {
-            return ResponseEntity.badRequest().body("Insira uma avaliação para prosseguir!");
+            return ResponseEntity.badRequest().build();
         }
-        Game game = repository.findFirstByNomeOrderByIdAsc(nome).orElse(null);
-        if (game == null) {
-            return ResponseEntity.noContent().build();
-        }
-        if (index < 0 || index >= game.getAvaliacoes().size()) {
+
+        Avaliacoes avaliacao = avaliacoesRepository.findById(idAvaliacao).orElse(null);
+        if (avaliacao == null) {
             return ResponseEntity.notFound().build();
         }
-        Avaliacoes avaliacao = game.getAvaliacoes().get(index);
-        avaliacao.setNota(dados.getNota());
-        avaliacao.setComentario(dados.getComentario());
-        repository.save(game);
-        return ResponseEntity.ok("A avaliação de " + game.getNome() + " foi editado com sucesso!");
+
+        avaliacao.setAvaliador(dados.avaliador());
+        avaliacao.setNota(dados.nota());
+        avaliacao.setComentario(dados.comentario());
+
+        Avaliacoes avaliacaoAtualizada = avaliacoesRepository.save(avaliacao);
+
+        return  ResponseEntity.ok(new AvaliacaoResponseDTO(avaliacaoAtualizada));
     }
 
     // Deletes
