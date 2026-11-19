@@ -5,19 +5,22 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
-import java.util.Optional;
 
 public interface GameRepository extends JpaRepository<Game, Long> {
-    Optional<Game> findFirstByNomeOrderByIdAsc(String nome);
 
-    @Query("""
-        SELECT g FROM Game g
-        WHERE (:nome IS NULL OR LOWER(g.nome) LIKE LOWER(CONCAT('%', :nome, '%')))
-          AND (:genero IS NULL OR LOWER(g.genero) = LOWER(:genero))
-          AND (:metacritic IS NULL OR g.metacritic = :metacritic)
-        ORDER BY g.id
-        """)
-    List<Game> filtrar(@Param("nome") String nome,
-                      @Param("genero") String genero,
-                      @Param("metacritic") Integer metacritic);
+    @Query(value = """
+            SELECT * FROM games g
+            WHERE (CAST(:nome AS text) IS NULL OR
+                    REPLACE(TRANSLATE (LOWER(g.nome), 'áàâãéèíìóòôõúùûç', 'aaaaeeiioooouuuc'), ' ', '')
+                            LIKE CONCAT('%', REPLACE(TRANSLATE (LOWER(CAST(:nome AS text)), 'áàâãéèíìóòôõúùûç', 'aaaaeeiioooouuuc'), ' ', ''), '%'))
+              AND (CAST(:genero AS text) IS NULL OR
+                    REPLACE(TRANSLATE (LOWER(g.genero), 'áàâãéèíìóòôõúùûç', 'aaaaeeiioooouuuc'), ' ', '')
+                            LIKE CONCAT('%', REPLACE(TRANSLATE (LOWER(CAST(:genero AS text)), 'áàâãéèíìóòôõúùûç', 'aaaaeeiioooouuuc'), ' ', ''), '%'))
+              AND (CAST(:metacritic AS integer) IS NULL OR g.metacritic = CAST(:metacritic AS integer))
+            ORDER BY g.id
+            """, nativeQuery = true)
+    List<Game> filtrar(
+            @Param("nome") String nome,
+            @Param("genero") String genero,
+            @Param("metacritic") Integer metacritic);
 }
