@@ -50,10 +50,10 @@ public class Security {
                         //Leitura completa
                         .requestMatchers(HttpMethod.GET, "/game/review/**").permitAll()
                         //Autorização ADMIN
-                        .requestMatchers(HttpMethod.POST, "/game/review/gravar-jogo").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/game/review/editar-jogo/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/game/review/deletar-jogo/**").hasRole("ADMIN")
                         //Autorização Usuários
+                        .requestMatchers(HttpMethod.POST, "/game/review/gravar-jogo").authenticated()
                         .requestMatchers(HttpMethod.POST,"/game/review/gravar-avaliacao/**").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/game/review/editar-avaliacao/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/game/review/deletar-avaliacao/**").authenticated()
