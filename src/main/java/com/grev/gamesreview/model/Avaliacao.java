@@ -12,7 +12,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "avaliacoes")
 @JsonPropertyOrder({"id", "avaliador", "nota", "comentario"})
-public class Avaliacoes {
+public class Avaliacao {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

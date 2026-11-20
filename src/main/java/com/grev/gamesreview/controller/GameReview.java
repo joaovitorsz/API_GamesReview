@@ -1,25 +1,21 @@
 package com.grev.gamesreview.controller;
 
 import com.grev.gamesreview.DTO.*;
-import com.grev.gamesreview.model.Avaliacoes;
-import com.grev.gamesreview.model.Game;
-import com.grev.gamesreview.repository.AvaliacoesRepository;
-import com.grev.gamesreview.repository.GameRepository;
+import com.grev.gamesreview.service.AvaliacaoService;
+import com.grev.gamesreview.service.GameService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
 @RequestMapping("/game")
-@Transactional
 public class GameReview {
-    private final GameRepository repository;
-    private final AvaliacoesRepository avaliacoesRepository;
+    private final GameService gameService;
+    private final AvaliacaoService avaliacaoService;
 
-    public GameReview(GameRepository repository, AvaliacoesRepository avaliacoesRepository) {
-        this.repository = repository;
-        this.avaliacoesRepository = avaliacoesRepository;
+    public GameReview(GameService gameService, AvaliacaoService avaliacaoService) {
+        this.gameService = gameService;
+        this.avaliacaoService = avaliacaoService;
     }
 
     // Gets
@@ -30,48 +26,25 @@ public class GameReview {
             @RequestParam(required = false) String genero,
             @RequestParam(required = false) Integer metacritic) {
 
-        List<Game> jogos;
-
-        if (titulo == null && genero == null && metacritic == null) {
-            jogos = repository.findAll();
-        } else {
-            jogos = repository.filtrar(titulo, genero, metacritic);
-        }
-
-        List<GameResponseDTO> resposta = jogos.stream()
-                .map(GameResponseDTO::new)
-                .toList();
-
-        return ResponseEntity.ok(resposta);
+        return ResponseEntity.ok(gameService.listarJogos(titulo, genero, metacritic));
     }
 
     @GetMapping("/review/id/{id}")
     public ResponseEntity<GameResponseDTO> buscarPorId(
             @PathVariable Long id) {
 
-        Game game = repository.findById(id).orElse(null);
-
-        if (game == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(new GameResponseDTO(game));
+        return gameService.buscarPorId(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/review/listar-avaliacoes/{gameId}")
     public ResponseEntity<List<AvaliacaoResponseDTO>> gameAvaliacoes(
             @PathVariable Long gameId) {
 
-        Game game = repository.findById(gameId).orElse(null);
-
-        if (game == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        List<AvaliacaoResponseDTO> avaliacoesDTO = game.getAvaliacoes().stream()
-                .map(AvaliacaoResponseDTO::new)
-                .toList();
-
-        return ResponseEntity.ok(avaliacoesDTO);
+        return avaliacaoService.listarPorJogo(gameId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Posts
@@ -80,15 +53,10 @@ public class GameReview {
     public ResponseEntity<GameResponseDTO> gravarJogo(
             @RequestBody GameRequestDTO dados) {
 
-        Game novoJogo = new Game();
-        novoJogo.setNome(dados.titulo());
-        novoJogo.setGenero(dados.genero());
-        novoJogo.setMetacritic(dados.metacritic());
-        novoJogo.setSinopse(dados.sinopse());
-
-        Game jogoSalvo = repository.save(novoJogo);
-
-        return ResponseEntity.ok(new GameResponseDTO(jogoSalvo));
+        if (dados == null){
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(gameService.gravarJogo(dados));
     }
 
     @PostMapping("/review/gravar-avaliacao/{gameId}")
@@ -96,24 +64,10 @@ public class GameReview {
             @PathVariable Long gameId,
             @RequestBody AvaliacaoRequestDTO dados) {
 
-        if (dados == null) {
-            return ResponseEntity.badRequest().build();
+            return avaliacaoService.gravarAvaliacao(gameId, dados)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
         }
-        Game game = repository.findById(gameId).orElse(null);
-        if (game == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Avaliacoes novaAvaliacao = new Avaliacoes();
-        novaAvaliacao.setAvaliador(dados.avaliador());
-        novaAvaliacao.setNota(dados.nota());
-        novaAvaliacao.setComentario(dados.comentario());
-        novaAvaliacao.setGame(game);
-
-        Avaliacoes avaliacaoSalva = avaliacoesRepository.save(novaAvaliacao);
-
-        return ResponseEntity.ok(new AvaliacaoResponseDTO(avaliacaoSalva));
-    }
 
     // Puts
 
@@ -122,44 +76,27 @@ public class GameReview {
             @PathVariable Long gameId,
             @RequestBody GameRequestDTO dados) {
 
-        if (dados == null) {
+        if (dados == null){
             return ResponseEntity.badRequest().build();
         }
-        Game game = repository.findById(gameId).orElse(null);
-        if (game == null) {
-            return ResponseEntity.notFound().build();
-        }
 
-        if (dados.titulo() != null) game.setNome(dados.titulo());
-        if (dados.metacritic() != null) game.setMetacritic(dados.metacritic());
-        if (dados.genero() != null) game.setGenero(dados.genero());
-        if (dados.sinopse() != null) game.setSinopse(dados.sinopse());
-
-        Game jogoAtualizado = repository.save(game);
-
-        return ResponseEntity.ok(new GameResponseDTO(jogoAtualizado));
+        return gameService.editarJogo(gameId, dados)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/review/editar-avaliacao/{idAvaliacao}")
     public ResponseEntity<AvaliacaoResponseDTO> editarAvaliacao(
-            @PathVariable Integer idAvaliacao,
+            @PathVariable Long idAvaliacao,
             @RequestBody AvaliacaoUpdateDTO dados) {
 
         if (dados == null) {
             return ResponseEntity.badRequest().build();
         }
 
-        Avaliacoes avaliacao = avaliacoesRepository.findById(idAvaliacao).orElse(null);
-        if (avaliacao == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (dados.nota() != null) avaliacao.setNota(dados.nota());
-        if (dados.comentario() != null) avaliacao.setComentario(dados.comentario());
-
-        Avaliacoes avaliacaoAtualizada = avaliacoesRepository.save(avaliacao);
-
-        return  ResponseEntity.ok(new AvaliacaoResponseDTO(avaliacaoAtualizada));
+        return  avaliacaoService.editarAvaliacao(idAvaliacao, dados)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Deletes
@@ -168,34 +105,18 @@ public class GameReview {
     public ResponseEntity<String> deletarJogo(
             @PathVariable Long gameId) {
 
-        Game game = repository.findById(gameId).orElse(null);
-
-        if (game == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String nomeJogo = game.getNome();
-
-        repository.delete(game);
-        return ResponseEntity.ok("O jogo " + nomeJogo + " foi deletado!");
+        return gameService.deletarJogo(gameId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/review/deletar-avaliacao/{idAvaliacao}")
     public ResponseEntity<String> deletarAvaliacao(
-            @PathVariable Integer idAvaliacao) {
+            @PathVariable Long idAvaliacao) {
 
-        Avaliacoes avaliacao = avaliacoesRepository.findById(idAvaliacao).orElse(null);
-
-        if (avaliacao == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String nomeJogo = avaliacao.getGame().getNome();
-        String avaliador = avaliacao.getAvaliador();
-
-        avaliacoesRepository.delete(avaliacao);
-
-        return ResponseEntity.ok("Olá, " + avaliador + "! Sua avaliação de " + nomeJogo + " foi removida!");
+        return avaliacaoService.deletarAvaliacao(idAvaliacao)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
 }
